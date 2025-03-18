@@ -19,6 +19,7 @@ import {
 
 import {ResetIcon, TransferIcon} from '@components/Icon';
 import styles from '@styles/common';
+import { getFontSize } from '@styles/config';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
@@ -370,8 +371,8 @@ function App(): React.JSX.Element {
     <View style={_styles.header}>
       <TouchableOpacity onPress={reset}>
         <View style={_styles.resetBtn}>
-          <ResetIcon width={24} height={24} marginTop={4} marginRight={8} />
-          <Text style={{fontSize: 24}}>重設</Text>
+          <ResetIcon width={16} height={16} marginTop={4} marginRight={8} />
+          <Text style={{fontSize: getFontSize(16)}}>重設</Text>
         </View>
       </TouchableOpacity>
     </View>
@@ -380,8 +381,8 @@ function App(): React.JSX.Element {
   const safePadding = '5%';
 
   return (
-    <View>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+    <View style={{flex: 1, backgroundColor:'#fff'}}>
+      <StatusBar  />
       {Header}
       <ScrollView>
         <View
@@ -397,7 +398,7 @@ function App(): React.JSX.Element {
             <TouchableOpacity
               onPress={toggleMeasurement}
               style={_styles.convertBtn}>
-              <TransferIcon height={40} width={40} />
+              <TransferIcon height={24} width={24} />
             </TouchableOpacity>
             {usingChineseMeasurement
               ? UKMeasurementFields
@@ -436,27 +437,25 @@ const _styles = StyleSheet.create({
     alignContent: 'center',
   },
   grid: {
-    flex: 4,
+    flex: 6,
     justifyContent: 'center',
     alignContent: 'center',
   },
   unitText: {
-    fontSize: 32,
+    fontSize: getFontSize(16),
     flex: 1,
-    minWidth: 60,
     alignSelf: 'center',
   },
   unitsText: {
-    fontSize: 40,
+    fontSize: getFontSize(16),
     flex: 1,
   },
   valueInput: {
-    fontSize: 32,
+    fontSize: getFontSize(16),
     paddingHorizontal: 8,
-    paddingVertical: 8,
-    flex: 1,
-    minWidth: 88,
-    height: 88,
+    paddingVertical: 12,
+    flex: 2,
+    minHeight: getFontSize(16) + 24,
     textAlign: 'center',
     justifyContent: 'center',
     alignContent: 'center',
@@ -465,24 +464,23 @@ const _styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   fullValueInput: {
-    fontSize: 32,
+    fontSize: getFontSize(16),
     paddingHorizontal: 8,
     paddingVertical: 8,
     borderBottomWidth: 2,
     flex: 3,
     textAlign: 'right',
-    marginRight: 24,
-    minHeight: 72,
+    marginRight: 12,
   },
   convertBtn: {
     marginHorizontal: 'auto',
-    minWidth: 40,
-    minHeight: 40,
+    minWidth: 24,
+    minHeight: 24,
     padding: 20,
     margin: 12,
   },
   divider: {
-    backgroundColor: '#000',
+    backgroundColor: 'silver',
     width: '100%',
     height: 2,
     flex: 1,
@@ -490,7 +488,7 @@ const _styles = StyleSheet.create({
   },
   errorMessage: {
     color: 'red',
-    fontSize: 16,
+    fontSize: getFontSize(16),
   },
 });
 
