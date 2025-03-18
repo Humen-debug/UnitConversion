@@ -8,10 +8,10 @@
     "strictNullChecks": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./*"],
-      "@assets/*": ["assets/*"],
-      "@src/*": ["src/*"],
+      "@/*": ["./src"],
+      "@assets/*": ["src/assets/*"],
       "@components/*":["src/components/*"],
+      "@styles/*":["src/styles/*"]
     }
   },
 
