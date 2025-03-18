@@ -5,7 +5,7 @@
  * @format
  */
 
-import React, {useState} from 'react';
+import React, {createRef, useState} from 'react';
 import {
   ScrollView,
   StatusBar,
@@ -23,6 +23,11 @@ import styles from '@styles/common';
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
   const fullTextRegExp = /^[0-9]*. [0-9]*\.?[0-9]*$/;
+
+  const jinInputRef = createRef<TextInput>();
+  const liangInputRef = createRef<TextInput>();
+  const poundInputRef = createRef<TextInput>();
+  const ounceInputRef = createRef<TextInput>();
 
   const [ounceText, setOunceText] = useState<string | undefined>(undefined);
   const [poundText, setPoundText] = useState<string | undefined>(undefined);
@@ -43,6 +48,23 @@ function App(): React.JSX.Element {
   );
 
   const toggleMeasurement = () => {
+    if (usingChineseMeasurement) {
+      if (jinInputRef.current?.isFocused()) {
+        jinInputRef.current?.blur();
+      }
+      if (liangInputRef.current?.isFocused()) {
+        liangInputRef.current?.blur();
+      }
+      poundInputRef.current?.focus();
+    } else {
+      if (poundInputRef.current?.isFocused()) {
+        poundInputRef.current?.blur();
+      }
+      if (ounceInputRef.current?.isFocused()) {
+        ounceInputRef.current?.blur();
+      }
+      jinInputRef.current?.focus();
+    }
     setUsingChineseMeasurement(value => !value);
   };
 
@@ -58,21 +80,44 @@ function App(): React.JSX.Element {
   const moduleUnit = ({
     base,
     carry,
+    force = false,
   }: {
-    base: string | number | undefined;
-    carry?: string | number | undefined;
+    base?: string | number;
+    carry?: string | number;
+    force?: boolean;
   }): string => {
-    if (!base || (typeof base === 'string' && isNaN(parseFloat(base)))) {
+    if (force) {
+      base = 0;
+    }
+
+    if (
+      base === undefined ||
+      (typeof base === 'string' && isNaN(parseFloat(base))) ||
+      (typeof base === 'number' && isNaN(base))
+    ) {
       return '';
     }
     const num: number = typeof base === 'string' ? parseFloat(base) : base;
-    const quotient =
+    var quotient =
       Math.floor(num / 16) +
       (carry ? (typeof carry === 'string' ? parseFloat(carry) : carry) : 0);
-    const remainder = num % 16;
-    return `${quotient}. ${
-      Number.isInteger(remainder) ? remainder : remainder.toFixed(2)
-    }`;
+    var remainder = num % 16;
+
+    // if quotient is not an integer, transform the digital places to base number
+    if (!Number.isInteger(quotient)) {
+      const decimal = quotient - Math.floor(Math.abs(quotient));
+      remainder += decimal * 16;
+      quotient -= decimal;
+      if (remainder >= 16) {
+        quotient += Math.floor(remainder / 16);
+        remainder %= 16;
+      }
+    }
+    const decimals = Math.min(
+      2,
+      remainder.toString().split('.')[1]?.length ?? 0,
+    );
+    return `${quotient}. ${Number(remainder.toFixed(decimals))}`;
   };
 
   const reset = () => {
@@ -85,54 +130,108 @@ function App(): React.JSX.Element {
     setErrorMessage(undefined);
   };
 
+  const updatePoundOunceToJinLiang = ({
+    poundText: newPoundText,
+    ounceText: newOunceText,
+  }: {
+    poundText?: string;
+    ounceText?: string;
+  }) => {
+    const inputPound = newPoundText ? parseFloat(newPoundText) : undefined;
+    const inputOunce = newOunceText ? parseFloat(newOunceText) : undefined;
+
+    var pound: number = inputPound ?? parseFloat(poundText || '');
+    var ounce: number = inputOunce ?? parseFloat(ounceText || '');
+    if (isNaN(pound) && isNaN(ounce)) {
+      setPoundText(undefined);
+      setOunceText(undefined);
+      return;
+    }
+    const fullPoundOunce = moduleUnit({
+      carry: newPoundText ?? poundText,
+      base: newOunceText ?? ounceText,
+      force: !inputOunce,
+    });
+    const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
+    setPoundText(poundT);
+    setOunceText(ounceT);
+    setPoundOunceText(fullPoundOunce);
+
+    const liang = ounceToLiang(
+      poundToOunce(parseFloat(poundT)) + parseFloat(ounceT),
+    );
+    const fullJinLiang = moduleUnit({base: liang});
+    const [jinT, liangT] = fullJinLiang.split('. ', 2);
+    setJinText(jinT);
+    setLiangText(liangT);
+    setJinLiangText(fullJinLiang);
+  };
+
+  const updateJinLiangToPoundOunce = ({
+    jinText: newJinText,
+    liangText: newLiangText,
+  }: {
+    jinText?: string;
+    liangText?: string;
+  }) => {
+    const inputJin = newJinText ? parseFloat(newJinText) : undefined;
+    const inputLiang = newLiangText ? parseFloat(newLiangText) : undefined;
+
+    var jin: number = inputJin ?? parseFloat(jinText || '');
+    var liang: number = inputLiang ?? parseFloat(liangText || '');
+    if (isNaN(jin) && isNaN(liang)) {
+      setJinText(undefined);
+      setLiangText(undefined);
+      return;
+    }
+    const fullJinLiang = moduleUnit({
+      carry: newJinText ?? jinText,
+      base: newLiangText ?? liangText,
+      force: !inputLiang,
+    });
+    const [jinT, liangT] = fullJinLiang.split('. ', 2);
+    setJinText(jinT);
+    setLiangText(liangT);
+    setJinLiangText(fullJinLiang);
+
+    const ounce = liangToOunce(
+      jinToLiang(parseFloat(jinT)) + parseFloat(liangT),
+    );
+    const fullPoundOunce = moduleUnit({base: ounce});
+    const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
+    setPoundText(poundT);
+    setOunceText(ounceT);
+    setPoundOunceText(fullPoundOunce);
+  };
+
   const UKMeasurementFields = (
     <View style={styles.row}>
       <TextInput
         value={poundText}
+        ref={poundInputRef}
         onChangeText={text => {
-          const pound = parseFloat(text);
-          if (isNaN(pound)) {
-            setPoundText(undefined);
+          if (text.includes('.') && text.split('.')[1]?.length === 0) {
+            setPoundText(text);
             return;
           }
-          setPoundText(text);
-          setPoundOunceText(`${pound}. ${ounceText || 0}`);
-          
-          const liang = ounceToLiang(
-            poundToOunce(pound) + parseFloat(ounceText || '0'),
-          );
-          const fullJinLiang = moduleUnit({base: liang});
-          const [jinT, liangT] = fullJinLiang.split('. ', 2);
-          setJinText(jinT);
-          setLiangText(liangT);
-          setJinLiangText(fullJinLiang);
+          updatePoundOunceToJinLiang({poundText: text});
         }}
+        onSubmitEditing={() => ounceInputRef.current?.focus()}
         keyboardType="numeric"
         style={_styles.valueInput}
+        autoFocus={!usingChineseMeasurement}
         readOnly={usingChineseMeasurement}
       />
       <Text style={_styles.unitText}>磅</Text>
       <TextInput
         value={ounceText}
+        ref={ounceInputRef}
         onChangeText={text => {
-          const fullPoundOunce: string = moduleUnit({base: text});
-          if (fullPoundOunce.length === 0) {
-            setOunceText(undefined);
+          if (text.includes('.') && text.split('.')[1]?.length === 0) {
+            setOunceText(text);
             return;
           }
-
-          const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
-          const pound = parseFloat(poundText || '0') + parseFloat(poundT);
-          setPoundText(pound.toString());
-          setOunceText(ounceT);
-          setPoundOunceText(fullPoundOunce);
-
-          const liang = ounceToLiang(poundToOunce(pound) + parseFloat(ounceT));
-          const fullJinLiang = moduleUnit({base: liang});
-          const [jinT, liangT] = fullJinLiang.split('. ', 2);
-          setJinText(jinT);
-          setLiangText(liangT);
-          setJinLiangText(fullJinLiang);
+          updatePoundOunceToJinLiang({ounceText: text});
         }}
         keyboardType="numeric"
         style={_styles.valueInput}
@@ -146,55 +245,124 @@ function App(): React.JSX.Element {
     <View style={styles.row}>
       <TextInput
         value={jinText}
+        ref={jinInputRef}
         onChangeText={text => {
-          const jin = parseFloat(text);
-          if (isNaN(jin)) {
-            setJinText(undefined);
+          if (text.includes('.') && text.split('.')[1]?.length === 0) {
+            setJinText(text);
             return;
           }
-          setJinText(text);
-          setJinLiangText(`${jin}. ${liangText || 0}`);
-
-          const ounce = liangToOunce(
-            jinToLiang(jin) + parseFloat(ounceText || '0'),
-          );
-          const fullPoundOunce = moduleUnit({base: ounce});
-          const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
-          setPoundText(poundT);
-          setOunceText(ounceT);
-          setPoundOunceText(fullPoundOunce);
+          updateJinLiangToPoundOunce({jinText: text});
         }}
+        onSubmitEditing={() => liangInputRef.current?.focus()}
         keyboardType="numeric"
         style={_styles.valueInput}
+        autoFocus={usingChineseMeasurement}
         readOnly={!usingChineseMeasurement}
       />
       <Text style={_styles.unitText}>斤</Text>
       <TextInput
         value={liangText}
+        ref={liangInputRef}
         onChangeText={text => {
-          const fullJinLiang: string = moduleUnit({base: text});
-          if (fullJinLiang.length === 0) {
-            setLiangText(undefined);
+          if (text.includes('.') && text.split('.')[1]?.length === 0) {
+            setLiangText(text);
             return;
           }
-          const [jinT, liangT] = fullJinLiang.split('. ', 2);
-          const jin = parseFloat(jinText || '0') + parseFloat(jinT);
-          setJinText(jin.toString());
-          setLiangText(liangT);
-          setJinLiangText(fullJinLiang);
-
-          const ounce = liangToOunce(jinToLiang(jin) + parseFloat(liangT));
-          const fullPoundOunce = moduleUnit({base: ounce});
-          const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
-          setPoundText(poundT);
-          setOunceText(ounceT);
-          setPoundOunceText(fullPoundOunce);
+          updateJinLiangToPoundOunce({liangText: text});
         }}
         keyboardType="numeric"
         style={_styles.valueInput}
         readOnly={!usingChineseMeasurement}
       />
       <Text style={_styles.unitText}>兩</Text>
+    </View>
+  );
+
+  const FullChineseMeasurementField = (
+    <View style={styles.row}>
+      <TextInput
+        style={_styles.fullValueInput}
+        value={jinLiangText}
+        onChangeText={setJinLiangText}
+        onSubmitEditing={e => {
+          // validate input with xx. xx format
+          const regex = new RegExp(fullTextRegExp);
+          const text = e.nativeEvent.text;
+          if (!regex.test(text)) {
+            setErrorMessage('請按照 (斤). (兩) 的格式輸入有效數字');
+            return;
+          }
+          setErrorMessage('');
+          try {
+            const [jinInput, liangInput] = text.split('. ', 2);
+            // To compute carrying if user inputs liang larger than 16
+            const fullJinLiang = moduleUnit({
+              carry: jinInput,
+              base: liangInput,
+            });
+            const [jinT, liangT] = fullJinLiang.split('. ');
+            setJinText(jinT);
+            setLiangText(liangT);
+            setJinLiangText(fullJinLiang);
+
+            const ounce = liangToOunce(
+              jinToLiang(parseFloat(jinT)) + parseFloat(liangT),
+            );
+            const fullPoundOunce = moduleUnit({base: ounce});
+            const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
+            setPoundText(poundT);
+            setOunceText(ounceT);
+            setPoundOunceText(fullPoundOunce);
+          } catch (error) {
+            setErrorMessage('請按照 (斤). (兩) 的格式輸入有效數字');
+          }
+        }}
+      />
+      <Text style={_styles.unitText}>斤. 兩</Text>
+    </View>
+  );
+
+  const FullUKMeasurementField = (
+    <View style={styles.row}>
+      <TextInput
+        style={_styles.fullValueInput}
+        value={poundOunceText}
+        onChangeText={setPoundOunceText}
+        onSubmitEditing={e => {
+          // validate input with xx. xx format
+          const regex = new RegExp(fullTextRegExp);
+          const text = e.nativeEvent.text;
+          if (!regex.test(text)) {
+            setErrorMessage('請按照 (磅). (安士) 的格式輸入有效數字');
+            return;
+          }
+          setErrorMessage('');
+          try {
+            const [poundInput, ounceInput] = text.split('. ', 2);
+            const fullPoundOunce = moduleUnit({
+              carry: poundInput,
+              base: ounceInput,
+            });
+            const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
+            setPoundText(poundT);
+            setOunceText(ounceT);
+            setPoundOunceText(fullPoundOunce);
+
+            const liang = ounceToLiang(
+              poundToOunce(parseFloat(poundT)) + parseFloat(ounceT),
+            );
+
+            const fullJinLiang = moduleUnit({base: liang});
+            const [jinT, liangT] = fullJinLiang.split('. ', 2);
+            setJinText(jinT);
+            setLiangText(liangT);
+            setJinLiangText(fullJinLiang);
+          } catch (error) {
+            setErrorMessage('請按照 (磅). (安士) 的格式輸入有效數字');
+          }
+        }}
+      />
+      <Text style={_styles.unitText}>磅. 安士</Text>
     </View>
   );
 
@@ -237,90 +405,12 @@ function App(): React.JSX.Element {
           </View>
           <View style={_styles.divider} />
           <View style={{..._styles.grid, gap: 20}}>
-            <View style={styles.row}>
-              <TextInput
-                style={_styles.fullValueInput}
-                value={jinLiangText}
-                onChangeText={setJinLiangText}
-                onSubmitEditing={e => {
-                  // validate input with xx. xx format
-                  const regex = new RegExp(fullTextRegExp);
-                  const text = e.nativeEvent.text;
-                  if (!regex.test(text)) {
-                    setErrorMessage('請按照 (斤). (兩) 的格式輸入有效數字');
-                    return;
-                  }
-                  setErrorMessage('');
-                  try {
-                    const [jinInput, liangInput] = text.split('. ', 2);
-                    // To compute carrying if user inputs liang larger than 16
-                    const fullJinLiang = moduleUnit({
-                      carry: jinInput,
-                      base: liangInput,
-                    });
-                    const [jinT, liangT] = fullJinLiang.split('. ');
-                    setJinText(jinT);
-                    setLiangText(liangT);
-                    setJinLiangText(fullJinLiang);
-
-                    const ounce = liangToOunce(
-                      jinToLiang(parseFloat(jinT)) + parseFloat(liangT),
-                    );
-                    const fullPoundOunce = moduleUnit({base: ounce});
-                    const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
-                    setPoundText(poundT);
-                    setOunceText(ounceT);
-                    setPoundOunceText(fullPoundOunce);
-                  } catch (error) {
-                    setErrorMessage('請按照 (斤). (兩) 的格式輸入有效數字');
-                  }
-                }}
-              />
-
-              <Text style={_styles.unitText}>斤. 兩</Text>
-            </View>
-            <View style={styles.row}>
-              <TextInput
-                style={_styles.fullValueInput}
-                value={poundOunceText}
-                onChangeText={setPoundOunceText}
-                onSubmitEditing={e => {
-                  // validate input with xx. xx format
-                  const regex = new RegExp(fullTextRegExp);
-                  const text = e.nativeEvent.text;
-                  if (!regex.test(text)) {
-                    setErrorMessage('請按照 (磅). (安士) 的格式輸入有效數字');
-                    return;
-                  }
-                  setErrorMessage('');
-                  try {
-                    const [poundInput, ounceInput] = text.split('. ', 2);
-                    const fullPoundOunce = moduleUnit({
-                      carry: poundInput,
-                      base: ounceInput,
-                    });
-                    const [poundT, ounceT] = fullPoundOunce.split('. ', 2);
-                    setPoundText(poundT);
-                    setOunceText(ounceT);
-                    setPoundOunceText(fullPoundOunce);
-
-                    const liang = ounceToLiang(
-                      poundToOunce(parseFloat(poundT)) + parseFloat(ounceT),
-                    );
-
-                    const fullJinLiang = moduleUnit({base: liang});
-                    const [jinT, liangT] = fullJinLiang.split('. ', 2);
-                    setJinText(jinT);
-                    setLiangText(liangT);
-                    setJinLiangText(fullJinLiang);
-                  } catch (error) {
-                    setErrorMessage('請按照 (磅). (安士) 的格式輸入有效數字');
-                  }
-                }}
-              />
-
-              <Text style={_styles.unitText}>磅. 安士</Text>
-            </View>
+            {usingChineseMeasurement
+              ? FullChineseMeasurementField
+              : FullUKMeasurementField}
+            {!usingChineseMeasurement
+              ? FullChineseMeasurementField
+              : FullUKMeasurementField}
             <Text style={_styles.errorMessage}>{errorMessage}</Text>
           </View>
         </View>
